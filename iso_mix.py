@@ -1,32 +1,55 @@
 
 import numpy as np
-def rast(isotherm_list,Lambda, C):
-    if len(Lambda.shape) != 2:
+from scipy.integrate import trapz
+def rast(isotherm_list,P_i,T, Lamb, C):
+    if len(Lamb.shape) != 2:
         print('Lambda should be N x N array or matrix!')
         return
-    elif Lambda.shape[0] != Lambda.shape[1]:
+    elif Lamb.shape[0] != Lamb.shape[1]:
         print('Lambda should be N x N array or matrix!')
         return
     else:
-        N = Lambda.shape[0]
+        N = Lamb.shape[0]
+    def spreading_P_err(x_N_piART):
+
+    y_i = P_i/np.sum(P_i)
+    x_init = P_i/np.sum(P_i)
+    piA_RT_list = []
+    for xx,iso,pp in zip(x_init,isotherm_list,P_i):
+        P_ran = np.linspace(0,pp)
+        q_P = iso(P_ran, T)/P_ran
+        piA_RT_tmp = trapz(q_P,P_ran)
+        piA_RT_list.append(piA_RT_tmp)
+        
+    ln_gam = ln_gamma_i(x_init, Lamb,C, piA_RT_list[0])
 
 
 def ln_gamma_i(x,Lamb, C, piA_RT):
     N = len(x)
-    ln_gamma = []   # array N
+    ln_gamma = np.zeros(N)   # array N
     sum_xlam = []   # array N
+    sum_xlam_ov_xlam = []
+    exp_term = []
     for ii in range(N):
         xlam_tmp = 0
         for jj in range(N):
             xlam_tmp = xlam_tmp + x[jj]*Lamb[ii,jj]
         sum_xlam.append(xlam_tmp)
-        
-        sum_xlam_ov_xlam = []
+        sum_xlam_xlam = 0
         for kk in range(N):
             sum_xlam_tmp = 0
             for ll in range(N):
                 sum_xlam_tmp = sum_xlam_tmp + Lamb[kk,ll]*x[ll]
-            sum_xlam_ov_xlam.append(Lamb[kk,ii])
+            sum_xlam_xlam = sum_xlam_xlam + Lamb[kk,ii]*x[kk]/sum_xlam_tmp
+        sum_xlam_ov_xlam.append(sum_xlam_xlam)
+        exp_term_tmp = 1-np.exp(C*piA_RT)
+        exp_term.append(exp_term_tmp)
+        all_term_tmp = (1-np.log(xlam_tmp)-sum_xlam_xlam)*exp_term_tmp
+        ln_gamma[ii] = all_term_tmp
+    return ln_gamma
+
+        
+            
 
 
 
