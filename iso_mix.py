@@ -83,20 +83,28 @@ def rast(isotherm_list,P_i,T, Lamb, C):
         q_P = iso(P_ran, T)/P_ran
         piA_RT_tmp = trapz(q_P,P_ran)
         piA_RT_list.append(piA_RT_tmp)
+    opt_list = []
     opt_x_list = []
     opt_fn_list = []
     for spr_P0 in piA_RT_list:
         x0 = np.concatenate([x_init, [spr_P0]])
         optres_tmp = minimize(spreading_P_err, x0, method = 'Nelder-mead')
+        opt_list.append(optres_tmp)
+        opt_x_list.append(optres_tmp.x)
+        opt_fn_list.append(optres_tmp.fun)
+        optres_tmp = minimize(spreading_P_err, x0, method = 'Powell')
+        opt_list.append(optres_tmp)
         opt_x_list.append(optres_tmp.x)
         opt_fn_list.append(optres_tmp.fun)
         optres_tmp = minimize(spreading_P_err, x0, method = 'COBYLA')
+        opt_list.append(optres_tmp)
         opt_x_list.append(optres_tmp.x)
         opt_fn_list.append(optres_tmp.fun)
+    arg_min = np.argmin(opt_fn_list)
     x_re = np.zeros(N)
-    x_re[:-1] = optres_tmp.x[:-1]
+    x_re[:-1] = opt_list[arg_min].x[:-1]
     x_re[-1] = 1- np.sum(x_re[:-1])
-    piA_RT_re = optres_tmp.x[-1]
+    piA_RT_re = opt_list[arg_min].x[-1]
     ln_gam_re = ln_gamma_i(x_re,Lamb, C, piA_RT_re)
     gamma_re = np.exp(ln_gam_re)
     #print(iso_spr[0](P_i[0]/optres_tmp.x[0]/gamma_re[0]))
