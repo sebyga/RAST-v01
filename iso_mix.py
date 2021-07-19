@@ -20,7 +20,7 @@ def ln_gamma_i(x,Lamb, C, piA_RT):
                 sum_xlam_tmp = sum_xlam_tmp + Lamb[kk,ll]*x[ll]
             sum_xlam_xlam = sum_xlam_xlam + Lamb[kk,ii]*x[kk]/sum_xlam_tmp
         sum_xlam_ov_xlam.append(sum_xlam_xlam)
-        exp_term_tmp = 1-np.exp(C*piA_RT)
+        exp_term_tmp = 1-np.exp(-C*piA_RT)
         exp_term.append(exp_term_tmp)
         all_term_tmp = (1-np.log(xlam_tmp)-sum_xlam_xlam)*exp_term_tmp
         ln_gamma[ii] = all_term_tmp
@@ -77,31 +77,88 @@ def rast(isotherm_list,P_i,T, Lamb, C):
     y_i = P_i/np.sum(P_i)
     x_init = P_i/np.sum(P_i)
     x_init = x_init[:-1]
+    
     piA_RT_list = []
-    for xx,iso,pp in zip(x_init,isotherm_list,P_i):
+    qm = []
+    #theta = []
+    bP = []
+    for iso,pp in zip(isotherm_list,P_i):
         P_ran = np.linspace(0.0001,pp)
         q_P = iso(P_ran, T)/P_ran
         piA_RT_tmp = trapz(q_P,P_ran)
         piA_RT_list.append(piA_RT_tmp)
+        q_max = iso(1E8, T)
+        theta_tmp = q_P[-1]*pp/q_max
+        bP_tmp = theta_tmp/(1-theta_tmp)
+        bP.append(bP_tmp)
+        #theta.append(theta_tmp)
+        qm.append(q_max)
+    bP_sum = np.sum(bP)
+    q_extended = np.array(qm)*np.array(bP)/(1+ bP_sum)
+    x_extended = q_extended/np.sum(q_extended)
+    x_ext_init = x_extended[:-1]
+
+    opt_list = []
     opt_x_list = []
     opt_fn_list = []
     for spr_P0 in piA_RT_list:
         x0 = np.concatenate([x_init, [spr_P0]])
         optres_tmp = minimize(spreading_P_err, x0, method = 'Nelder-mead')
+        opt_list.append(optres_tmp)
         opt_x_list.append(optres_tmp.x)
         opt_fn_list.append(optres_tmp.fun)
+        if optres_tmp.fun < 1E-6:
+            #print(optres_tmp.fun)
+            #print('YEAH')
+            break
+        optres_tmp = minimize(spreading_P_err, x0, method = 'Powell')
+        opt_list.append(optres_tmp)
+        opt_x_list.append(optres_tmp.x)
+        opt_fn_list.append(optres_tmp.fun)
+        if optres_tmp.fun < 1E-2:
+            break
         optres_tmp = minimize(spreading_P_err, x0, method = 'COBYLA')
+        opt_list.append(optres_tmp)
         opt_x_list.append(optres_tmp.x)
         opt_fn_list.append(optres_tmp.fun)
+        if optres_tmp.fun < 1E-2:
+            break
+    for spr_P0 in piA_RT_list:
+        x0 = np.concatenate([x_ext_init, [spr_P0]])
+        optres_tmp = minimize(spreading_P_err, x0, method = 'Nelder-mead')
+        opt_list.append(optres_tmp)
+        opt_x_list.append(optres_tmp.x)
+        opt_fn_list.append(optres_tmp.fun)
+        if optres_tmp.fun < 1E-2:
+            break
+        optres_tmp = minimize(spreading_P_err, x0, method = 'Powell')
+        opt_list.append(optres_tmp)
+        opt_x_list.append(optres_tmp.x)
+        opt_fn_list.append(optres_tmp.fun)
+        if optres_tmp.fun < 1E-2:
+            break
+        optres_tmp = minimize(spreading_P_err, x0, method = 'COBYLA')
+        opt_list.append(optres_tmp)
+        opt_x_list.append(optres_tmp.x)
+        opt_fn_list.append(optres_tmp.fun)
+        if optres_tmp.fun < 1E-2:
+            break
+    #print(opt_fn_list)
+    arg_min = np.argmin(opt_fn_list)
     x_re = np.zeros(N)
-    x_re[:-1] = optres_tmp.x[:-1]
-    x_re[-1] = 1- np.sum(x_re[:-1])
-    piA_RT_re = optres_tmp.x[-1]
+    x_re[:-1] = opt_list[arg_min].x[:-1]
+    x_re[-1] = np.min([1- np.sum(x_re[:-1],0)])
+    piA_RT_re = opt_list[arg_min].x[-1]
     ln_gam_re = ln_gamma_i(x_re,Lamb, C, piA_RT_re)
     gamma_re = np.exp(ln_gam_re)
     #print(iso_spr[0](P_i[0]/optres_tmp.x[0]/gamma_re[0]))
     #print(iso_spr[1](P_i[1]/(1- optres_tmp.x[0])/gamma_re[1]))
-    P_pure = np.array(P_i)/x_re/gamma_re
+    arg_0 = x_re == 0
+    arg_non0 = arg_0 == False
+    P_pure = np.zeros(N)
+    P_pure[arg_non0] = np.array(P_i)[arg_non0]/x_re[arg_non0]/gamma_re[arg_non0]
+    #P_pure[arg_0] = np.array(P_i)[arg_0]/x_re[arg_0]/gamma_re[arg_0]
+    #P_pure[arg_0] = 0
     q_pure = np.zeros(N)
     for ii in range(N):
         q_pure[ii] = iso_list[ii](P_pure[ii])
