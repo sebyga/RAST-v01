@@ -7,6 +7,8 @@ import pandas as pd
 from scipy.integrate import trapz
 from scipy.optimize import minimize
 from scipy.optimize import shgo
+from scipy.optimize import differential_evolution
+from scipy.optimize import dual_annealing
 
 # files handling
 import os
@@ -59,7 +61,7 @@ def iso2err(par,P,q,iso_fn):
     return err_sum + penaltyy
 
 #%% Single Isothemr 3: Fitting function with a single model
-method_list = ['Nelder-mead','Powell','COBYLA','shgo']
+method_list = ['Nelder-mead','Powell','COBYLA','differential_evolution']
 def find_par(isofn, n_par, P,q, methods):
     p_arr = np.array(P)
     q_arr = np.array(q)
@@ -71,6 +73,14 @@ def find_par(isofn, n_par, P,q, methods):
             bounds = np.zeros([n_par,2])
             bounds[:,1] = 5
             optres_tmp = shgo(obj_fn,bounds,)
+        elif me == 'differential_evolution':
+            bounds = np.zeros([n_par,2])
+            bounds[:,1] = 5
+            optres_tmp = differential_evolution(obj_fn, bounds,)
+        elif me == 'dual_annealing':
+            bounds = np.zeros([n_par,2])
+            bounds[:,1] = 5
+            optres_tmp = dual_annealing(obj_fn, bounds,)
         else:
             x0 = 2*np.ones(n_par)  # INITIAL GUESS !!!
             x0[0] = q[-1]
